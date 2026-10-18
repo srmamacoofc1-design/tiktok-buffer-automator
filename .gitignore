@@ -1,0 +1,7 @@
+dist/
+build/
+*.spec
+__pycache__/
+*.pyc
+uploads/*
+!uploads/.gitkeep

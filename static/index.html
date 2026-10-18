@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TikTok Buffer Automator Pro</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body {
+      background-color: #0b0c10;
+      color: #e2e8f0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .neon-border {
+      border: 1px solid rgba(254, 44, 85, 0.3);
+      box-shadow: 0 0 15px rgba(254, 44, 85, 0.15);
+    }
+    .neon-cyan-border {
+      border: 1px solid rgba(0, 242, 254, 0.3);
+      box-shadow: 0 0 15px rgba(0, 242, 254, 0.15);
+    }
+    .tiktok-gradient-text {
+      background: linear-gradient(90deg, #00f2fe 0%, #fe2c55 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .tab-active {
+      border-bottom: 2px solid #fe2c55;
+      color: #fe2c55;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Navbar -->
+  <header class="bg-gray-900/80 backdrop-blur border-b border-gray-800 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-400 to-rose-500 flex items-center justify-center text-white shadow-lg">
+          <i class="fa-brands fa-tiktok text-xl"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold tracking-tight tiktok-gradient-text">TikTok Buffer Automator</h1>
+          <p class="text-xs text-gray-400">Automação Contínua • Estoque Infinito de Vídeos</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4">
+        <div class="flex items-center gap-2 bg-emerald-950/40 text-emerald-400 border border-emerald-800/50 px-3 py-1.5 rounded-full text-xs font-medium">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>Robô Ativo (Auto-Feeder)</span>
+        </div>
+        <button onclick="syncAll()" id="btn-sync" class="bg-gradient-to-r from-cyan-500 to-rose-500 hover:opacity-90 text-white font-medium text-xs px-4 py-2 rounded-lg flex items-center gap-2 transition shadow">
+          <i class="fa-solid fa-rotate"></i> Sincronizar Fila
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Navigation Tabs -->
+  <nav class="bg-gray-900 border-b border-gray-800">
+    <div class="max-w-7xl mx-auto px-4 flex gap-6 text-sm font-medium">
+      <button onclick="setTab('dashboard')" id="tab-dashboard" class="py-3 px-2 tab-active flex items-center gap-2">
+        <i class="fa-solid fa-table-columns"></i> Painel Geral & Perfis
+      </button>
+      <button onclick="setTab('upload')" id="tab-upload" class="py-3 px-2 text-gray-400 hover:text-white flex items-center gap-2">
+        <i class="fa-solid fa-cloud-arrow-up"></i> Abastecer Estoque (Upload em Lote)
+      </button>
+      <button onclick="setTab('stock')" id="tab-stock" class="py-3 px-2 text-gray-400 hover:text-white flex items-center gap-2">
+        <i class="fa-solid fa-layer-group"></i> Gerenciar Estoque & Fila
+      </button>
+      <button onclick="setTab('analytics')" id="tab-analytics" class="py-3 px-2 text-gray-400 hover:text-white flex items-center gap-2">
+        <i class="fa-solid fa-chart-line text-cyan-400"></i> Métricas & Views
+      </button>
+      <button onclick="setTab('accounts')" id="tab-accounts" class="py-3 px-2 text-gray-400 hover:text-white flex items-center gap-2">
+        <i class="fa-solid fa-key"></i> Chaves de API & Contas
+      </button>
+      <button onclick="setTab('logs')" id="tab-logs" class="py-3 px-2 text-gray-400 hover:text-white flex items-center gap-2">
+        <i class="fa-solid fa-terminal"></i> Logs
+      </button>
+
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full">
+
+    <!-- TAB 1: DASHBOARD -->
+    <section id="view-dashboard">
+      <div class="mb-6 flex justify-between items-center">
+        <div>
+          <h2 class="text-2xl font-bold text-white">Perfis Conectados do TikTok</h2>
+          <p class="text-sm text-gray-400">Status em tempo real das contas, capacidade da fila e estoque disponível.</p>
+        </div>
+      </div>
+
+      <!-- Profiles Grid -->
+      <div id="profiles-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="p-8 text-center text-gray-400 col-span-3">
+          <i class="fa-solid fa-circle-notch fa-spin text-2xl text-rose-500"></i>
+          <p class="mt-2 text-sm">Carregando perfis do TikTok...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: UPLOAD EM LOTE (ABASTECER ESTOQUE) -->
+    <section id="view-upload" class="hidden">
+      <div class="max-w-3xl mx-auto bg-gray-900 border border-gray-800 rounded-2xl p-6 md:p-8 shadow-xl">
+        <div class="mb-6">
+          <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-boxes-stacked text-rose-500"></i> Abastecer Estoque de Vídeos
+          </h2>
+          <p class="text-sm text-gray-400">Arraste dezenas de vídeos .mp4 de uma vez. O app programa automaticamente as datas, declara IA e alimenta o Buffer!</p>
+        </div>
+
+        <form id="upload-form" onsubmit="handleUpload(event)">
+          <!-- Seleção de Perfil -->
+          <div class="mb-5">
+            <label class="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-2">1. Selecione o Perfil Alvo</label>
+            <select id="upload-profile-select" required onchange="onProfileSelectChange()" class="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-rose-500">
+              <option value="">Carregando perfis...</option>
+            </select>
+          </div>
+
+          <!-- Dropzone -->
+          <div class="mb-5">
+            <label class="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-2">2. Escolha os Vídeos (.mp4)</label>
+            <div id="dropzone" onclick="document.getElementById('file-input').click()" class="border-2 border-dashed border-gray-700 hover:border-rose-500/70 rounded-2xl p-8 text-center cursor-pointer transition bg-gray-800/40">
+              <i class="fa-solid fa-file-video text-4xl text-gray-500 mb-3"></i>
+              <p class="text-sm font-medium text-gray-200">Arraste seus vídeos aqui ou clique para selecionar</p>
+              <p class="text-xs text-gray-400 mt-1">Você pode selecionar 10, 30, 50 vídeos de uma só vez (.mp4)</p>
+              <input type="file" id="file-input" multiple accept="video/mp4,video/*" class="hidden" onchange="onFilesSelected(event)">
+            </div>
+            <div id="file-summary" class="mt-2 text-xs text-cyan-400 font-medium hidden"></div>
+          </div>
+
+          <!-- Previsão Dinâmica de Duração -->
+          <div id="calculator-box" class="mb-6 bg-gradient-to-r from-cyan-950/40 to-rose-950/40 border border-gray-800 rounded-xl p-4 hidden">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg bg-rose-500/20 text-rose-400 flex items-center justify-center text-lg">
+                <i class="fa-solid fa-calculator"></i>
+              </div>
+              <div class="flex-1">
+                <h4 class="text-sm font-semibold text-white" id="calc-title">Previsão do Estoque</h4>
+                <p class="text-xs text-gray-300 mt-0.5" id="calc-desc">Calculando...</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Opções Automáticas -->
+          <div class="space-y-4 mb-6 bg-gray-800/40 p-4 rounded-xl border border-gray-800">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm font-medium text-white flex items-center gap-2">
+                  <i class="fa-solid fa-robot text-cyan-400"></i> Declarar Conteúdo Gerado por I.A
+                </p>
+                <p class="text-xs text-gray-400">Ativa a tag oficial de IA no TikTok para evitar penalizações.</p>
+              </div>
+              <input type="checkbox" id="check-is-ai" checked class="w-5 h-5 accent-rose-500 rounded cursor-pointer">
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1">Hashtags Padrão</label>
+              <textarea id="upload-hashtags" rows="2" class="w-full bg-gray-800 border border-gray-700 text-xs text-white rounded-lg p-2.5 focus:outline-none focus:border-rose-500"></textarea>
+            </div>
+          </div>
+
+          <!-- Barra de Progresso de Upload -->
+          <div id="upload-progress-container" class="mb-4 hidden">
+            <div class="flex justify-between text-xs text-gray-300 mb-1">
+              <span id="upload-status-text">Enviando arquivos...</span>
+              <span id="upload-percent">0%</span>
+            </div>
+            <div class="w-full bg-gray-800 rounded-full h-2.5 overflow-hidden">
+              <div id="upload-bar" class="bg-gradient-to-r from-cyan-400 to-rose-500 h-2.5 rounded-full w-0 transition-all"></div>
+            </div>
+          </div>
+
+          <button type="submit" id="btn-submit-upload" class="w-full bg-gradient-to-r from-cyan-500 to-rose-500 hover:opacity-90 text-white font-bold py-3.5 rounded-xl transition flex items-center justify-center gap-2 shadow-lg">
+            <i class="fa-solid fa-rocket"></i> Abastecer Estoque & Iniciar Fila
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <!-- TAB 3: ESTOQUE & FILA -->
+    <section id="view-stock" class="hidden">
+      <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 class="text-xl font-bold text-white">Estoque e Fila de Postagens</h2>
+            <p class="text-xs text-gray-400">Vídeos guardados localmente e vídeos agendados no Buffer.</p>
+          </div>
+          <div class="flex gap-2">
+            <select id="filter-profile" onchange="loadStockTable()" class="bg-gray-800 border border-gray-700 text-xs text-white rounded-lg px-3 py-2">
+              <option value="">Todos os Perfis</option>
+            </select>
+            <select id="filter-status" onchange="loadStockTable()" class="bg-gray-800 border border-gray-700 text-xs text-white rounded-lg px-3 py-2">
+              <option value="">Todos os Status</option>
+              <option value="estoque">Em Estoque</option>
+              <option value="agendado_no_buffer">Agendado no Buffer</option>
+              <option value="erro">Com Erro</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-gray-800 text-gray-400 uppercase tracking-wider text-[10px]">
+              <tr>
+                <th class="py-3 px-4">#</th>
+                <th class="py-3 px-4">Perfil</th>
+                <th class="py-3 px-4">Título / Vídeo</th>
+                <th class="py-3 px-4">Status</th>
+                <th class="py-3 px-4">Data Prevista</th>
+                <th class="py-3 px-4 text-right">Ação</th>
+              </tr>
+            </thead>
+            <tbody id="stock-tbody" class="divide-y divide-gray-800 text-gray-300">
+              <tr>
+                <td colspan="6" class="py-8 text-center text-gray-500">Carregando estoque...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: MÉTRICAS & VIEWS -->
+    <section id="view-analytics" class="hidden">
+      <div class="mb-6 flex justify-between items-center">
+        <div>
+          <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-chart-line text-cyan-400"></i> Desempenho & Visualizações
+          </h2>
+          <p class="text-sm text-gray-400">Estatísticas consolidadas dos posts publicados nos seus perfis do TikTok.</p>
+        </div>
+        <button onclick="loadAnalytics()" class="bg-gray-800 hover:bg-gray-700 text-xs text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+          <i class="fa-solid fa-rotate"></i> Atualizar Métricas
+        </button>
+      </div>
+
+      <!-- Métricas Totais Cards -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-gray-900 border border-gray-800 p-5 rounded-2xl">
+          <span class="text-xs text-gray-400 uppercase font-semibold flex items-center gap-1.5 mb-1">
+            <i class="fa-solid fa-play text-rose-500"></i> Visualizações Totais
+          </span>
+          <span class="text-3xl font-extrabold text-white" id="stat-total-views">...</span>
+          <span class="text-[10px] text-gray-400 block mt-1">Vídeos dos últimos dias</span>
+        </div>
+        <div class="bg-gray-900 border border-gray-800 p-5 rounded-2xl">
+          <span class="text-xs text-gray-400 uppercase font-semibold flex items-center gap-1.5 mb-1">
+            <i class="fa-solid fa-heart text-pink-500"></i> Curtidas (Reactions)
+          </span>
+          <span class="text-3xl font-extrabold text-white" id="stat-total-likes">...</span>
+          <span class="text-[10px] text-gray-400 block mt-1">Engajamento de likes</span>
+        </div>
+        <div class="bg-gray-900 border border-gray-800 p-5 rounded-2xl">
+          <span class="text-xs text-gray-400 uppercase font-semibold flex items-center gap-1.5 mb-1">
+            <i class="fa-solid fa-share text-cyan-400"></i> Compartilhamentos
+          </span>
+          <span class="text-3xl font-extrabold text-white" id="stat-total-shares">...</span>
+          <span class="text-[10px] text-gray-400 block mt-1">Vídeos compartilhados</span>
+        </div>
+        <div class="bg-gray-900 border border-gray-800 p-5 rounded-2xl">
+          <span class="text-xs text-gray-400 uppercase font-semibold flex items-center gap-1.5 mb-1">
+            <i class="fa-solid fa-users text-amber-400"></i> Alcance (Reach)
+          </span>
+          <span class="text-3xl font-extrabold text-white" id="stat-total-reach">...</span>
+          <span class="text-[10px] text-gray-400 block mt-1">Pessoas alcançadas</span>
+        </div>
+      </div>
+
+      <!-- Detalhamento por Perfil -->
+      <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-6">
+        <h3 class="text-base font-bold text-white mb-4">Desempenho por Perfil</h3>
+        <div id="analytics-profiles-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <p class="text-gray-400 text-xs">Carregando métricas dos perfis...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: CHAVES & CONTAS -->
+    <section id="view-accounts" class="hidden">
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-1 bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 class="text-lg font-bold text-white mb-2 flex items-center gap-2">
+            <i class="fa-solid fa-plus-circle text-cyan-400"></i> Adicionar Nova Chave
+          </h3>
+          <p class="text-xs text-gray-400 mb-4">Adicione seus outros tokens do Buffer. O app descobre os perfis conectados automaticamente!</p>
+
+          <form onsubmit="handleAddAccount(event)" class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-gray-300 mb-1">Nome de Identificação (Opcional)</label>
+              <input type="text" id="acc-name" placeholder="Ex: Conta 4 - buffer" class="w-full bg-gray-800 border border-gray-700 text-xs text-white rounded-lg p-2.5 focus:outline-none focus:border-cyan-400">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-300 mb-1">Token de API do Buffer</label>
+              <input type="text" id="acc-token" required placeholder="Cole o token aqui..." class="w-full bg-gray-800 border border-gray-700 text-xs text-white rounded-lg p-2.5 focus:outline-none focus:border-cyan-400">
+            </div>
+            <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs py-2.5 rounded-lg transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-check"></i> Conectar & Importar Perfis
+            </button>
+          </form>
+        </div>
+
+        <div class="lg:col-span-2 bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <i class="fa-solid fa-shield-halved text-rose-500"></i> Contas Conectadas
+          </h3>
+          <div id="accounts-list" class="space-y-3">
+            <p class="text-xs text-gray-400">Carregando contas...</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: LOGS -->
+    <section id="view-logs" class="hidden">
+      <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+        <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+          <i class="fa-solid fa-terminal text-emerald-400"></i> Registro de Eventos do Robô
+        </h3>
+        <div id="logs-container" class="space-y-2 font-mono text-xs max-h-[600px] overflow-y-auto bg-gray-950 p-4 rounded-xl border border-gray-800">
+          <p class="text-gray-500">Carregando logs...</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Modal de Configuração de Perfil -->
+  <div id="settings-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-bold text-white" id="modal-profile-title">Configurar Perfil</h3>
+        <button onclick="closeSettingsModal()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form onsubmit="handleSaveSettings(event)" class="space-y-4">
+        <input type="hidden" id="modal-profile-id">
+        <div>
+          <label class="block text-xs font-semibold text-gray-300 mb-1">Horários de Postagem por Dia (Horário de Brasília)</label>
+          <input type="text" id="modal-times" required placeholder='["10:30", "14:30", "18:30"]' class="w-full bg-gray-800 border border-gray-700 text-xs text-white rounded-lg p-2.5 focus:outline-none focus:border-rose-500">
+          <p class="text-[10px] text-gray-400 mt-1">Exemplo: ["10:00", "14:00", "18:00"] (determina quantos vídeos postar por dia).</p>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-300 mb-1">Hashtags Padrão do Canal</label>
+          <textarea id="modal-hashtags" rows="3" required class="w-full bg-gray-800 border border-gray-700 text-xs text-white rounded-lg p-2.5 focus:outline-none focus:border-rose-500"></textarea>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-300 mb-1">Capacidade Máxima da Fila no Buffer</label>
+          <input type="number" id="modal-max-queue" value="10" min="1" max="100" class="w-full bg-gray-800 border border-gray-700 text-xs text-white rounded-lg p-2.5 focus:outline-none focus:border-rose-500">
+          <p class="text-[10px] text-gray-400 mt-1">Padrão para conta gratuita do Buffer: 10.</p>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeSettingsModal()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs rounded-lg">Cancelar</button>
+          <button type="submit" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-medium rounded-lg">Salvar Configurações</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    let globalProfiles = [];
+    let selectedFiles = [];
+
+    // Alternar abas
+    function setTab(tab) {
+      const views = ['dashboard', 'upload', 'stock', 'analytics', 'accounts', 'logs'];
+      views.forEach(v => {
+        const el = document.getElementById(`view-${v}`);
+        const t = document.getElementById(`tab-${v}`);
+        if (el) el.classList.add('hidden');
+        if (t) {
+          t.classList.remove('tab-active', 'text-white');
+          t.classList.add('text-gray-400');
+        }
+      });
+      const targetEl = document.getElementById(`view-${tab}`);
+      const targetTab = document.getElementById(`tab-${tab}`);
+      if (targetEl) targetEl.classList.remove('hidden');
+      if (targetTab) {
+        targetTab.classList.add('tab-active', 'text-white');
+        targetTab.classList.remove('text-gray-400');
+      }
+
+      if (tab === 'dashboard') loadProfiles();
+      if (tab === 'stock') loadStockTable();
+      if (tab === 'analytics') loadAnalytics();
+      if (tab === 'accounts') loadAccounts();
+      if (tab === 'logs') loadLogs();
+    }
+
+    async function loadAnalytics() {
+      const container = document.getElementById('analytics-profiles-container');
+      container.innerHTML = '<p class="text-xs text-cyan-400 font-mono col-span-3">Consultando métricas no Buffer...</p>';
+      try {
+        const res = await fetch('/api/metrics-summary');
+        const data = await res.json();
+        
+        document.getElementById('stat-total-views').innerText = data.total_views ? data.total_views.toLocaleString('pt-BR') : '0';
+        document.getElementById('stat-total-likes').innerText = data.total_likes ? data.total_likes.toLocaleString('pt-BR') : '0';
+        document.getElementById('stat-total-shares').innerText = data.total_shares ? data.total_shares.toLocaleString('pt-BR') : '0';
+        document.getElementById('stat-total-reach').innerText = data.total_reach ? data.total_reach.toLocaleString('pt-BR') : '0';
+
+        if (!data.profiles || !data.profiles.length) {
+          container.innerHTML = '<p class="text-xs text-gray-500">Nenhum dado encontrado.</p>';
+          return;
+        }
+
+        container.innerHTML = data.profiles.map(p => `
+          <div class="bg-gray-800/60 p-4 rounded-xl border border-gray-700/60">
+            <div class="flex items-center justify-between mb-3">
+              <span class="font-bold text-white text-sm">@${p.profile_name}</span>
+              <span class="text-[10px] text-gray-400">${p.posts_analyzed || 0} posts analisados</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-center text-xs">
+              <div class="bg-gray-900/60 p-2 rounded-lg">
+                <span class="text-[10px] text-gray-400 block">Views</span>
+                <span class="font-bold text-cyan-400">${(p.total_views || 0).toLocaleString('pt-BR')}</span>
+              </div>
+              <div class="bg-gray-900/60 p-2 rounded-lg">
+                <span class="text-[10px] text-gray-400 block">Likes</span>
+                <span class="font-bold text-pink-400">${(p.total_likes || 0).toLocaleString('pt-BR')}</span>
+              </div>
+            </div>
+          </div>
+        `).join('');
+      } catch (e) {
+        container.innerHTML = `<p class="text-xs text-rose-400">Erro ao carregar métricas: ${e}</p>`;
+      }
+    }
+
+
+    // Carregar Perfis
+    async function loadProfiles() {
+      try {
+        const res = await fetch('/api/profiles');
+        globalProfiles = await res.json();
+        renderProfilesGrid();
+        populateProfileDropdowns();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function renderProfilesGrid() {
+      const container = document.getElementById('profiles-container');
+      if (!globalProfiles.length) {
+        container.innerHTML = '<p class="col-span-3 text-center text-gray-500">Nenhum perfil conectado ainda.</p>';
+        return;
+      }
+
+      container.innerHTML = globalProfiles.map(p => {
+        const maxQ = p.max_buffer_queue || 10;
+        const qCount = p.buffer_queue_count || 0;
+        const pct = Math.min(100, Math.round((qCount / maxQ) * 100));
+        const postsPerDay = p.daily_times.length;
+
+        return `
+          <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 relative overflow-hidden transition hover:border-gray-700 shadow-lg">
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-xl bg-gray-800 border border-gray-700 flex items-center justify-center text-xl text-rose-500">
+                  <i class="fa-brands fa-tiktok"></i>
+                </div>
+                <div>
+                  <h3 class="font-bold text-white text-base">@${p.name}</h3>
+                  <p class="text-xs text-gray-400">${p.account_name || 'Conta Buffer'}</p>
+                </div>
+              </div>
+              <button onclick="openSettingsModal(${p.id})" title="Configurações" class="w-8 h-8 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white flex items-center justify-center transition">
+                <i class="fa-solid fa-gear text-xs"></i>
+              </button>
+            </div>
+
+            <!-- Fila Buffer -->
+            <div class="mb-4 bg-gray-950/60 p-3 rounded-xl border border-gray-800/80">
+              <div class="flex justify-between items-center text-xs mb-1.5">
+                <span class="text-gray-400 flex items-center gap-1.5">
+                  <i class="fa-solid fa-server text-cyan-400"></i> Fila Ativa no Buffer
+                </span>
+                <span class="font-bold ${qCount >= maxQ ? 'text-rose-400' : 'text-cyan-400'}">${qCount} / ${maxQ}</span>
+              </div>
+              <div class="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
+                <div class="h-2 rounded-full transition-all ${qCount >= maxQ ? 'bg-rose-500' : 'bg-cyan-400'}" style="width: ${pct}%"></div>
+              </div>
+            </div>
+
+            <!-- Estoque e Duração -->
+            <div class="grid grid-cols-2 gap-3 mb-5 text-center">
+              <div class="bg-gray-800/50 p-2.5 rounded-xl border border-gray-800">
+                <span class="text-[10px] text-gray-400 uppercase font-semibold block">Estoque Local</span>
+                <span class="text-lg font-bold text-white">${p.stock_count} <span class="text-xs text-gray-400 font-normal">vídeos</span></span>
+              </div>
+              <div class="bg-gray-800/50 p-2.5 rounded-xl border border-gray-800">
+                <span class="text-[10px] text-gray-400 uppercase font-semibold block">Frequência</span>
+                <span class="text-lg font-bold text-white">${postsPerDay} <span class="text-xs text-gray-400 font-normal">/ dia</span></span>
+              </div>
+            </div>
+
+            <!-- Previsão -->
+            <div class="mb-5 bg-gradient-to-r from-cyan-950/20 to-rose-950/20 border border-gray-800 p-3 rounded-xl flex items-center gap-2.5">
+              <i class="fa-regular fa-clock text-rose-400"></i>
+              <div class="text-xs">
+                <span class="text-gray-400">Autonomia do Estoque:</span>
+                <span class="font-semibold text-white block">${p.duration_text}</span>
+              </div>
+            </div>
+
+            <button onclick="goToUploadForProfile(${p.id})" class="w-full bg-gray-800 hover:bg-rose-600 text-white font-medium text-xs py-2.5 rounded-xl transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-plus"></i> Abastecer Este Perfil
+            </button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function populateProfileDropdowns() {
+      const upSelect = document.getElementById('upload-profile-select');
+      const filterSelect = document.getElementById('filter-profile');
+      
+      const opts = globalProfiles.map(p => `<option value="${p.id}">@${p.name} (${p.account_name})</option>`).join('');
+      upSelect.innerHTML = `<option value="">Selecione um perfil...</option>` + opts;
+      filterSelect.innerHTML = `<option value="">Todos os Perfis</option>` + opts;
+    }
+
+    function goToUploadForProfile(pid) {
+      setTab('upload');
+      document.getElementById('upload-profile-select').value = pid;
+      onProfileSelectChange();
+    }
+
+    function onProfileSelectChange() {
+      const pid = parseInt(document.getElementById('upload-profile-select').value);
+      const profile = globalProfiles.find(p => p.id === pid);
+      if (profile) {
+        document.getElementById('upload-hashtags').value = profile.default_hashtags || '';
+      }
+      recalculateEstimate();
+    }
+
+    function onFilesSelected(event) {
+      selectedFiles = Array.from(event.target.files);
+      const summary = document.getElementById('file-summary');
+      if (selectedFiles.length > 0) {
+        summary.innerText = `✓ ${selectedFiles.length} vídeo(s) selecionado(s) para upload.`;
+        summary.classList.remove('hidden');
+      } else {
+        summary.classList.add('hidden');
+      }
+      recalculateEstimate();
+    }
+
+    function recalculateEstimate() {
+      const pid = parseInt(document.getElementById('upload-profile-select').value);
+      const profile = globalProfiles.find(p => p.id === pid);
+      const count = selectedFiles.length;
+      const box = document.getElementById('calculator-box');
+
+      if (!profile || count === 0) {
+        box.classList.add('hidden');
+        return;
+      }
+
+      box.classList.remove('hidden');
+      const postsPerDay = profile.daily_times.length || 5;
+      const totalDays = (count / postsPerDay).toFixed(1);
+
+      
+      document.getElementById('calc-title').innerText = `🚀 ${count} vídeos para @${profile.name}`;
+      document.getElementById('calc-desc').innerHTML = `
+        Com <strong>${postsPerDay} vídeos/dia</strong> nos horários programados, esse lote cobrirá 
+        <strong class="text-cyan-300 font-bold">${totalDays} dias inteiros</strong> de postagens automáticas!
+        <br><span class="text-gray-400 text-[11px]">*Os primeiros 10 vídeos vão direto para o Buffer agora, e os restantes alimentam a fila automaticamente conforme forem postados.</span>
+      `;
+    }
+
+    async function handleUpload(e) {
+      e.preventDefault();
+      const pid = document.getElementById('upload-profile-select').value;
+      if (!pid) return alert('Selecione um perfil!');
+      if (!selectedFiles.length) return alert('Selecione ao menos 1 arquivo .mp4!');
+
+      const formData = new FormData();
+      formData.append('profile_id', pid);
+      formData.append('custom_hashtags', document.getElementById('upload-hashtags').value);
+      formData.append('is_ai', document.getElementById('check-is-ai').checked);
+
+      for (let f of selectedFiles) {
+        formData.append('videos', f);
+      }
+
+      const progressBox = document.getElementById('upload-progress-container');
+      const bar = document.getElementById('upload-bar');
+      const statusText = document.getElementById('upload-status-text');
+      const percentText = document.getElementById('upload-percent');
+      const submitBtn = document.getElementById('btn-submit-upload');
+
+      progressBox.classList.remove('hidden');
+      submitBtn.disabled = true;
+      submitBtn.classList.add('opacity-50');
+
+      try {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/upload-stock', true);
+
+        xhr.upload.onprogress = (evt) => {
+          if (evt.lengthComputable) {
+            const p = Math.round((evt.loaded / evt.total) * 100);
+            bar.style.width = p + '%';
+            percentText.innerText = p + '%';
+            statusText.innerText = `Enviando ${selectedFiles.length} vídeos para o estoque local...`;
+          }
+        };
+
+        xhr.onload = async () => {
+          if (xhr.status === 200) {
+            statusText.innerText = 'Upload concluído! Sincronizando fila com o Buffer...';
+            bar.style.width = '100%';
+            percentText.innerText = '100%';
+            setTimeout(() => {
+              alert('Vídeos adicionados ao estoque com sucesso! O robô já começou a alimentar a fila do Buffer.');
+              selectedFiles = [];
+              document.getElementById('file-input').value = '';
+              document.getElementById('file-summary').classList.add('hidden');
+              progressBox.classList.add('hidden');
+              submitBtn.disabled = false;
+              submitBtn.classList.remove('opacity-50');
+              setTab('dashboard');
+            }, 800);
+          } else {
+            alert('Erro no envio: ' + xhr.responseText);
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('opacity-50');
+          }
+        };
+
+        xhr.send(formData);
+      } catch (err) {
+        alert('Erro: ' + err);
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50');
+      }
+    }
+
+    async function loadStockTable() {
+      const pid = document.getElementById('filter-profile').value;
+      const status = document.getElementById('filter-status').value;
+      let url = '/api/stock?';
+      if (pid) url += `profile_id=${pid}&`;
+      if (status) url += `status=${status}&`;
+
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        const tbody = document.getElementById('stock-tbody');
+
+        if (!data.length) {
+          tbody.innerHTML = '<tr><td colspan="6" class="py-6 text-center text-gray-500">Nenhum vídeo encontrado.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = data.map(item => {
+          let statusBadge = '';
+          if (item.status === 'estoque') {
+            statusBadge = '<span class="bg-amber-950 text-amber-400 border border-amber-800 px-2 py-0.5 rounded-full text-[10px]">Em Estoque</span>';
+          } else if (item.status === 'agendado_no_buffer') {
+            statusBadge = '<span class="bg-cyan-950 text-cyan-400 border border-cyan-800 px-2 py-0.5 rounded-full text-[10px]">Agendado no Buffer</span>';
+          } else if (item.status === 'erro') {
+            statusBadge = `<span title="${item.error_message || ''}" class="bg-rose-950 text-rose-400 border border-rose-800 px-2 py-0.5 rounded-full text-[10px] cursor-help">Erro</span>`;
+          }
+
+          let dateText = '-';
+          if (item.scheduled_at) {
+            try {
+              const d = new Date(item.scheduled_at);
+              dateText = d.toLocaleString('pt-BR');
+            } catch(e) {}
+          }
+
+          return `
+            <tr class="hover:bg-gray-800/40">
+              <td class="py-3 px-4 font-mono text-gray-400">#${item.id}</td>
+              <td class="py-3 px-4 font-semibold text-white">@${item.profile_name}</td>
+              <td class="py-3 px-4">
+                <span class="font-medium text-white block">${item.title}</span>
+                <span class="text-[10px] text-gray-500">${item.filename}</span>
+              </td>
+              <td class="py-3 px-4">${statusBadge}</td>
+              <td class="py-3 px-4 text-gray-300 font-mono text-[11px]">${dateText}</td>
+              <td class="py-3 px-4 text-right">
+                <button onclick="deleteStockItem(${item.id})" class="text-gray-500 hover:text-rose-400 transition" title="Remover">
+                  <i class="fa-solid fa-trash-can"></i>
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function deleteStockItem(id) {
+      if (!confirm('Deseja remover este vídeo do estoque?')) return;
+      await fetch(`/api/stock/${id}`, { method: 'DELETE' });
+      loadStockTable();
+    }
+
+    async function syncAll() {
+      const btn = document.getElementById('btn-sync');
+      btn.innerHTML = '<i class="fa-solid fa-rotate fa-spin"></i> Sincronizando...';
+      try {
+        await fetch('/api/sync', { method: 'POST' });
+        setTimeout(async () => {
+          await loadProfiles();
+          btn.innerHTML = '<i class="fa-solid fa-rotate"></i> Sincronizar Fila';
+          alert('Sincronização concluída! A fila e o estoque foram atualizados.');
+        }, 1500);
+      } catch (e) {
+        btn.innerHTML = '<i class="fa-solid fa-rotate"></i> Sincronizar Fila';
+      }
+    }
+
+    async function loadAccounts() {
+      const res = await fetch('/api/accounts');
+      const data = await res.json();
+      const list = document.getElementById('accounts-list');
+      
+      if (!data.length) {
+        list.innerHTML = '<p class="text-xs text-gray-500">Nenhuma conta cadastrada.</p>';
+        return;
+      }
+
+      list.innerHTML = data.map(a => `
+        <div class="bg-gray-800/60 p-4 rounded-xl border border-gray-700/60 flex items-center justify-between">
+          <div>
+            <h4 class="font-bold text-white text-sm">${a.name}</h4>
+            <p class="text-xs text-gray-400 font-mono">${a.email}</p>
+          </div>
+          <span class="bg-cyan-950 text-cyan-400 border border-cyan-800 text-[10px] px-2.5 py-1 rounded-full font-medium">Conectado</span>
+        </div>
+      `).join('');
+    }
+
+    async function handleAddAccount(e) {
+      e.preventDefault();
+      const token = document.getElementById('acc-token').value;
+      const name = document.getElementById('acc-name').value;
+      
+      const formData = new FormData();
+      formData.append('token', token);
+      if (name) formData.append('name', name);
+
+      try {
+        const res = await fetch('/api/accounts', { method: 'POST', body: formData });
+        const resJson = await res.json();
+        if (res.ok) {
+          alert('Conta e perfis adicionados com sucesso!');
+          document.getElementById('acc-token').value = '';
+          document.getElementById('acc-name').value = '';
+          loadAccounts();
+          loadProfiles();
+        } else {
+          alert('Erro: ' + resJson.detail);
+        }
+      } catch (err) {
+        alert('Erro ao conectar: ' + err);
+      }
+    }
+
+    async function loadLogs() {
+      const res = await fetch('/api/logs');
+      const data = await res.json();
+      const container = document.getElementById('logs-container');
+      
+      if (!data.length) {
+        container.innerHTML = '<p class="text-gray-500">Nenhum log registrado ainda.</p>';
+        return;
+      }
+
+      container.innerHTML = data.map(l => {
+        let color = 'text-gray-300';
+        if (l.level === 'error') color = 'text-rose-400';
+        if (l.level === 'success') color = 'text-emerald-400';
+        if (l.level === 'warn') color = 'text-amber-400';
+
+        const time = new Date(l.created_at).toLocaleTimeString('pt-BR');
+        return `<div><span class="text-gray-500">[${time}]</span> <span class="${color}">[${l.level.toUpperCase()}]</span> ${l.profile_name ? `(@${l.profile_name}) ` : ''}${l.message}</div>`;
+      }).join('');
+    }
+
+    // Modal de Configurações
+    function openSettingsModal(pid) {
+      const p = globalProfiles.find(x => x.id === pid);
+      if (!p) return;
+      document.getElementById('modal-profile-id').value = p.id;
+      document.getElementById('modal-profile-title').innerText = `Configurar @${p.name}`;
+      document.getElementById('modal-times').value = JSON.stringify(p.daily_times);
+      document.getElementById('modal-hashtags').value = p.default_hashtags || '';
+      document.getElementById('modal-max-queue').value = p.max_buffer_queue || 10;
+      document.getElementById('settings-modal').classList.remove('hidden');
+    }
+
+    function closeSettingsModal() {
+      document.getElementById('settings-modal').classList.add('hidden');
+    }
+
+    async function handleSaveSettings(e) {
+      e.preventDefault();
+      const pid = document.getElementById('modal-profile-id').value;
+      const formData = new FormData();
+      formData.append('daily_times', document.getElementById('modal-times').value);
+      formData.append('default_hashtags', document.getElementById('modal-hashtags').value);
+      formData.append('max_buffer_queue', document.getElementById('modal-max-queue').value);
+
+      const res = await fetch(`/api/profiles/${pid}/settings`, { method: 'POST', body: formData });
+      if (res.ok) {
+        closeSettingsModal();
+        loadProfiles();
+      } else {
+        alert('Erro ao salvar configurações.');
+      }
+    }
+
+    // Inicialização
+    loadProfiles();
+  </script>
+</body>
+</html>
