@@ -237,14 +237,14 @@ def get_all_metrics(force: bool = False):
     import time
     global _METRICS_CACHE
     now = time.time()
-    if not force and _METRICS_CACHE["data"] and (now - _METRICS_CACHE["timestamp"] < 180):
+    if not force and _METRICS_CACHE["data"] and (now - _METRICS_CACHE["timestamp"] < 120):
         return _METRICS_CACHE["data"]
 
     conn = get_db()
     cursor = conn.cursor()
 
     # Lê dados persistentes do metrics_cache
-    cursor.execute("SELECT * FROM metrics_cache ORDER BY profile_id ASC")
+    cursor.execute("SELECT * FROM metrics_cache ORDER BY total_views DESC")
     cached_rows = {r["profile_id"]: dict(r) for r in cursor.fetchall()}
 
     cursor.execute("""
@@ -257,12 +257,20 @@ def get_all_metrics(force: bool = False):
     profiles = cursor.fetchall()
 
     summary = {
+        "title": "QUANTAS VIEWS FEZ NO DIA DE TODOS OS CANAIS",
+        "views_today_total": 0,
+        "posts_today_total": 0,
+        "likes_today_total": 0,
+        "shares_today_total": 0,
+        "reach_today_total": 0,
         "total_views": 0,
         "total_likes": 0,
         "total_comments": 0,
         "total_shares": 0,
         "total_reach": 0,
-        "profiles": []
+        "updated_at": datetime.now().isoformat(),
+        "profiles": [],
+        "today_posts": []
     }
 
     for p in profiles:
@@ -305,6 +313,18 @@ def get_all_metrics(force: bool = False):
         m["profile_id"] = pid
         m["profile_name"] = p["name"]
         m["avatar_url"] = p["avatar_url"] if "avatar_url" in p.keys() and p["avatar_url"] else cached.get("avatar_url")
+        m["views_today"] = cached.get("views_today", 0)
+        m["posts_today"] = cached.get("posts_today", 0)
+        m["likes_today"] = cached.get("likes_today", 0)
+        m["shares_today"] = cached.get("shares_today", 0)
+        m["reach_today"] = cached.get("reach_today", 0)
+
+        summary["views_today_total"] += m["views_today"]
+        summary["posts_today_total"] += m["posts_today"]
+        summary["likes_today_total"] += m["likes_today"]
+        summary["shares_today_total"] += m["shares_today"]
+        summary["reach_today_total"] += m["reach_today"]
+
         summary["total_views"] += m.get("total_views", 0)
         summary["total_likes"] += m.get("total_likes", 0)
         summary["total_comments"] += m.get("total_comments", 0)
@@ -312,8 +332,46 @@ def get_all_metrics(force: bool = False):
         summary["total_reach"] += m.get("total_reach", 0)
         summary["profiles"].append(m)
 
+    # Ordenar perfis por views_today decrescente para o ranking
+    summary["profiles"].sort(key=lambda x: x.get("views_today", 0), reverse=True)
+
+    # Buscar vídeos postados/agendados para hoje
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    cursor.execute("""
+        SELECT v.id, v.profile_id, v.title, v.caption, v.public_url, v.status, v.scheduled_at,
+               p.name as profile_name, p.avatar_url
+        FROM video_stock v
+        JOIN profiles p ON v.profile_id = p.id
+        WHERE v.scheduled_at LIKE ? OR v.status = 'agendado_no_buffer'
+        ORDER BY v.scheduled_at DESC LIMIT 15
+    """, (f"{today_str}%",))
+    summary["today_posts"] = [dict(r) for r in cursor.fetchall()]
+
     conn.close()
+    _METRICS_CACHE = {"data": summary, "timestamp": now}
     return summary
+
+@app.get("/api/analytics/daily")
+def get_daily_analytics(force: bool = False):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT log_date, 
+               SUM(views_today) as views, 
+               SUM(posts_today) as posts, 
+               SUM(likes_today) as likes
+        FROM daily_views_history
+        GROUP BY log_date
+        ORDER BY log_date ASC
+        LIMIT 7
+    """)
+    chart_history = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+
+    summary = get_all_metrics(force=force)
+    data = dict(summary)
+    data["chart_history"] = chart_history
+    return data
 
 
 @app.post("/api/profiles/{profile_id}/settings")

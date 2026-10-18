@@ -115,6 +115,45 @@ def init_db():
         created_at TEXT
     )
     """)
+
+    # Tabela de cache de métricas consolidadas
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS metrics_cache (
+        profile_id INTEGER PRIMARY KEY,
+        profile_name TEXT,
+        total_views INTEGER DEFAULT 0,
+        total_likes INTEGER DEFAULT 0,
+        total_comments INTEGER DEFAULT 0,
+        total_shares INTEGER DEFAULT 0,
+        total_reach INTEGER DEFAULT 0,
+        posts_analyzed INTEGER DEFAULT 0,
+        avatar_url TEXT,
+        views_today INTEGER DEFAULT 0,
+        posts_today INTEGER DEFAULT 0,
+        likes_today INTEGER DEFAULT 0,
+        shares_today INTEGER DEFAULT 0,
+        reach_today INTEGER DEFAULT 0,
+        updated_at TEXT
+    )
+    """)
+
+    # Tabela de histórico diário de visualizações
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS daily_views_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        log_date TEXT,
+        profile_id INTEGER,
+        profile_name TEXT,
+        views_today INTEGER DEFAULT 0,
+        posts_today INTEGER DEFAULT 0,
+        likes_today INTEGER DEFAULT 0,
+        shares_today INTEGER DEFAULT 0,
+        reach_today INTEGER DEFAULT 0,
+        total_views_snapshot INTEGER DEFAULT 0,
+        updated_at TEXT,
+        UNIQUE(log_date, profile_id)
+    )
+    """)
     
     conn.commit()
     conn.close()
