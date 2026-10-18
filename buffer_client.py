@@ -15,18 +15,29 @@ class BufferClient:
             "Content-Type": "application/json"
         }
 
-    def execute_query(self, query: str, variables: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def execute_query(self, query: str, variables: Optional[Dict[str, Any]] = None, retries: int = 5) -> Dict[str, Any]:
         payload = {"query": query}
         if variables:
             payload["variables"] = variables
 
         data_bytes = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(BUFFER_API_URL, data=data_bytes, headers=self.headers)
-        with urllib.request.urlopen(req) as resp:
-            res = json.loads(resp.read().decode("utf-8"))
-            if "errors" in res:
-                raise Exception(f"Buffer GraphQL Error: {json.dumps(res['errors'])}")
-            return res.get("data", {})
+        
+        for attempt in range(retries):
+            try:
+                with urllib.request.urlopen(req) as resp:
+                    res = json.loads(resp.read().decode("utf-8"))
+                    if "errors" in res:
+                        raise Exception(f"Buffer GraphQL Error: {json.dumps(res['errors'])}")
+                    return res.get("data", {})
+            except urllib.error.HTTPError as e:
+                if e.code == 429 and attempt < retries - 1:
+                    wait_time = (attempt + 1) * 10
+                    print(f"    [Buffer Rate Limit 429] Aguardando {wait_time}s antes de tentar novamente...")
+                    import time
+                    time.sleep(wait_time)
+                else:
+                    raise e
 
     def get_account_and_channels(self) -> Dict[str, Any]:
         """Recupera informações da conta e lista todos os canais conectados"""
