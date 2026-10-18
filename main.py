@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from database import init_db, get_db
+from database import init_db, get_db, resolve_db_path
 from buffer_client import BufferClient
 from feeder import sync_profile, sync_all_active_profiles, FeederWorker, log_event
 
@@ -28,10 +28,11 @@ feeder_worker = None
 async def lifespan(app: FastAPI):
     global feeder_worker
     init_db()
-    # Inicia o FeederWorker para monitorar a cada 300 segundos (5 minutos)
-    feeder_worker = FeederWorker(interval_seconds=300)
-    feeder_worker.start()
-    logging.info("FeederWorker em background ativado.")
+    # Inicia o FeederWorker para monitorar a cada 300 segundos apenas em ambiente local
+    if not os.environ.get("VERCEL"):
+        feeder_worker = FeederWorker(interval_seconds=300)
+        feeder_worker.start()
+        logging.info("FeederWorker em background ativado.")
     yield
     if feeder_worker:
         feeder_worker.stop()
@@ -72,13 +73,16 @@ def get_version():
     estoque_total = cursor.fetchone()["cnt"]
     cursor.execute("SELECT COUNT(*) as cnt FROM video_stock WHERE status = 'agendado_no_buffer'")
     agendado_total = cursor.fetchone()["cnt"]
+    cursor.execute("SELECT COUNT(*) as cnt FROM video_stock WHERE status = 'publicado'")
+    publicado_total = cursor.fetchone()["cnt"]
     conn.close()
     return {
-        "version": "1.0.2",
+        "version": "1.0.4",
         "video_stock_total": stock_total,
         "estoque_total": estoque_total,
         "agendado_total": agendado_total,
-        "db_exists": os.path.exists(os.path.join(os.path.dirname(__file__), "data", "app.db"))
+        "publicado_total": publicado_total,
+        "db_path": resolve_db_path()
     }
 
 @app.get("/api/profiles")
@@ -162,8 +166,16 @@ def get_profile_metrics(profile_id: int):
     metrics["profile_name"] = p["name"]
     return metrics
 
+_METRICS_CACHE = {"data": None, "timestamp": 0}
+
 @app.get("/api/metrics-summary")
-def get_all_metrics():
+def get_all_metrics(force: bool = False):
+    import time
+    global _METRICS_CACHE
+    now = time.time()
+    if not force and _METRICS_CACHE["data"] and (now - _METRICS_CACHE["timestamp"] < 180):
+        return _METRICS_CACHE["data"]
+
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
@@ -171,6 +183,7 @@ def get_all_metrics():
         FROM profiles p
         JOIN accounts a ON p.account_id = a.id
         WHERE p.active = 1
+        ORDER BY p.id ASC
     """)
 
     profiles = cursor.fetchall()
@@ -200,6 +213,8 @@ def get_all_metrics():
         except Exception as e:
             summary["profiles"].append({"profile_id": p["id"], "profile_name": p["name"], "error": str(e)})
 
+    _METRICS_CACHE["data"] = summary
+    _METRICS_CACHE["timestamp"] = now
     return summary
 
 

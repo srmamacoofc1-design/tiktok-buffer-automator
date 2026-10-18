@@ -1,17 +1,57 @@
 import sqlite3
 import os
 import json
+import logging
+import shutil
 from datetime import datetime
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "data", "app.db")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+CANDIDATE_PATHS = [
+    os.path.join(BASE_DIR, "data", "app.db"),
+    os.path.join(BASE_DIR, "api", "data", "app.db"),
+    os.path.join(os.getcwd(), "data", "app.db"),
+    os.path.join(os.getcwd(), "api", "data", "app.db")
+]
+
+def resolve_db_path() -> str:
+    source = None
+    for p in CANDIDATE_PATHS:
+        if os.path.exists(p) and os.path.getsize(p) > 0:
+            source = p
+            break
+            
+    # Se estiver rodando no Vercel (AWS Lambda)
+    if os.environ.get("VERCEL"):
+        tmp_path = "/tmp/app.db"
+        if source and (not os.path.exists(tmp_path) or os.path.getsize(tmp_path) < os.path.getsize(source)):
+            try:
+                shutil.copy2(source, tmp_path)
+            except Exception as e:
+                logging.warning(f"Aviso ao copiar DB para /tmp: {e}")
+        if os.path.exists(tmp_path):
+            return tmp_path
+        if source:
+            return source
+            
+    return source or CANDIDATE_PATHS[0]
+
+DB_PATH = resolve_db_path()
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
+    path = resolve_db_path()
+    try:
+        conn = sqlite3.connect(path, timeout=20)
+    except sqlite3.OperationalError:
+        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=20)
     conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    if os.environ.get("VERCEL"):
+        return
+    path = resolve_db_path()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     conn = get_db()
     cursor = conn.cursor()
     
@@ -81,4 +121,4 @@ def init_db():
 
 if __name__ == "__main__":
     init_db()
-    print("Banco de dados inicializado com sucesso!")
+    print(f"Banco de dados inicializado com sucesso em {resolve_db_path()}!")

@@ -6,3 +6,10 @@ __pycache__/
 uploads/*
 !uploads/.gitkeep
 cloudflared.exe
+check_*.py
+debug_*.py
+test_*.py
+inspect_*.py
+list_*.py
+quick_*.py
+upload_missing_to_cloud.py

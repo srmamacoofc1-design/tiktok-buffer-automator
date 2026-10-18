@@ -238,8 +238,8 @@
           </h2>
           <p class="text-sm text-gray-400">Estatísticas consolidadas dos posts publicados nos seus perfis do TikTok.</p>
         </div>
-        <button onclick="loadAnalytics()" class="bg-gray-800 hover:bg-gray-700 text-xs text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5">
-          <i class="fa-solid fa-rotate"></i> Atualizar Métricas
+        <button onclick="loadAnalytics(true)" class="bg-gray-800 hover:bg-cyan-600 transition text-xs text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+          <i class="fa-solid fa-rotate"></i> Atualizar Métricas Agora
         </button>
       </div>
 
@@ -396,11 +396,12 @@
       if (tab === 'logs') loadLogs();
     }
 
-    async function loadAnalytics() {
+    async function loadAnalytics(force = false) {
       const container = document.getElementById('analytics-profiles-container');
-      container.innerHTML = '<p class="text-xs text-cyan-400 font-mono col-span-3">Consultando métricas no Buffer...</p>';
+      container.innerHTML = '<p class="text-xs text-cyan-400 font-mono col-span-3"><i class="fa-solid fa-spinner fa-spin"></i> Consultando métricas reais via API do Buffer...</p>';
       try {
-        const res = await fetch('/api/metrics-summary');
+        const url = force ? '/api/metrics-summary?force=true' : '/api/metrics-summary';
+        const res = await fetch(url);
         const data = await res.json();
         
         document.getElementById('stat-total-views').innerText = data.total_views ? data.total_views.toLocaleString('pt-BR') : '0';
@@ -413,24 +414,49 @@
           return;
         }
 
-        container.innerHTML = data.profiles.map(p => `
-          <div class="bg-gray-800/60 p-4 rounded-xl border border-gray-700/60">
-            <div class="flex items-center justify-between mb-3">
-              <span class="font-bold text-white text-sm">@${p.profile_name}</span>
-              <span class="text-[10px] text-gray-400">${p.posts_analyzed || 0} posts analisados</span>
-            </div>
-            <div class="grid grid-cols-2 gap-2 text-center text-xs">
-              <div class="bg-gray-900/60 p-2 rounded-lg">
-                <span class="text-[10px] text-gray-400 block">Views</span>
-                <span class="font-bold text-cyan-400">${(p.total_views || 0).toLocaleString('pt-BR')}</span>
+        container.innerHTML = data.profiles.map(p => {
+          if (p.error) {
+            return `
+              <div class="bg-gray-800/60 p-4 rounded-xl border border-rose-900/60">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="font-bold text-white text-sm">@${p.profile_name}</span>
+                  <span class="text-[10px] text-rose-400 bg-rose-950/60 px-2 py-0.5 rounded">Aviso</span>
+                </div>
+                <p class="text-xs text-gray-400">${p.error}</p>
               </div>
-              <div class="bg-gray-900/60 p-2 rounded-lg">
-                <span class="text-[10px] text-gray-400 block">Likes</span>
-                <span class="font-bold text-pink-400">${(p.total_likes || 0).toLocaleString('pt-BR')}</span>
+            `;
+          }
+          return `
+            <div class="bg-gray-800/60 p-4 rounded-xl border border-gray-700/60 hover:border-gray-600 transition">
+              <div class="flex items-center justify-between mb-3">
+                <span class="font-bold text-white text-sm flex items-center gap-1.5">
+                  <i class="fa-brands fa-tiktok text-rose-500"></i> @${p.profile_name}
+                </span>
+                <span class="text-[10px] font-semibold text-emerald-400 bg-emerald-950/60 border border-emerald-800/50 px-2 py-0.5 rounded-full">
+                  ${p.posts_analyzed || 0} vídeos postados
+                </span>
+              </div>
+              <div class="grid grid-cols-2 gap-2 text-center text-xs">
+                <div class="bg-gray-900/80 p-2.5 rounded-lg border border-gray-800">
+                  <span class="text-[10px] text-gray-400 block mb-0.5"><i class="fa-solid fa-eye text-cyan-400"></i> Views</span>
+                  <span class="font-bold text-cyan-300 text-sm">${(p.total_views || 0).toLocaleString('pt-BR')}</span>
+                </div>
+                <div class="bg-gray-900/80 p-2.5 rounded-lg border border-gray-800">
+                  <span class="text-[10px] text-gray-400 block mb-0.5"><i class="fa-solid fa-heart text-pink-400"></i> Likes</span>
+                  <span class="font-bold text-pink-400 text-sm">${(p.total_likes || 0).toLocaleString('pt-BR')}</span>
+                </div>
+                <div class="bg-gray-900/80 p-2 rounded-lg border border-gray-800">
+                  <span class="text-[9px] text-gray-400 block"><i class="fa-solid fa-share text-cyan-400"></i> Shares</span>
+                  <span class="font-bold text-gray-200 text-xs">${(p.total_shares || 0).toLocaleString('pt-BR')}</span>
+                </div>
+                <div class="bg-gray-900/80 p-2 rounded-lg border border-gray-800">
+                  <span class="text-[9px] text-gray-400 block"><i class="fa-solid fa-users text-amber-400"></i> Alcance</span>
+                  <span class="font-bold text-gray-200 text-xs">${(p.total_reach || 0).toLocaleString('pt-BR')}</span>
+                </div>
               </div>
             </div>
-          </div>
-        `).join('');
+          `;
+        }).join('');
       } catch (e) {
         container.innerHTML = `<p class="text-xs text-rose-400">Erro ao carregar métricas: ${e}</p>`;
       }
@@ -492,15 +518,19 @@
               </div>
             </div>
 
-            <!-- Estoque e Duração -->
-            <div class="grid grid-cols-2 gap-3 mb-5 text-center">
-              <div class="bg-gray-800/50 p-2.5 rounded-xl border border-gray-800">
-                <span class="text-[10px] text-gray-400 uppercase font-semibold block">Estoque Local</span>
-                <span class="text-lg font-bold text-white">${p.stock_count} <span class="text-xs text-gray-400 font-normal">vídeos</span></span>
+            <!-- Estoque e Fila -->
+            <div class="grid grid-cols-3 gap-2 mb-4 text-center">
+              <div class="bg-gray-800/50 p-2 rounded-xl border border-gray-800">
+                <span class="text-[9px] text-gray-400 uppercase font-semibold block">Nuvem</span>
+                <span class="text-base font-bold text-cyan-400">${p.stock_count} <span class="text-[10px] text-gray-400 font-normal">vids</span></span>
               </div>
-              <div class="bg-gray-800/50 p-2.5 rounded-xl border border-gray-800">
-                <span class="text-[10px] text-gray-400 uppercase font-semibold block">Frequência</span>
-                <span class="text-lg font-bold text-white">${postsPerDay} <span class="text-xs text-gray-400 font-normal">/ dia</span></span>
+              <div class="bg-gray-800/50 p-2 rounded-xl border border-gray-800">
+                <span class="text-[9px] text-gray-400 uppercase font-semibold block">Fila Buffer</span>
+                <span class="text-base font-bold text-emerald-400">${qCount} <span class="text-[10px] text-gray-400 font-normal">vids</span></span>
+              </div>
+              <div class="bg-gray-800/50 p-2 rounded-xl border border-gray-800">
+                <span class="text-[9px] text-gray-400 uppercase font-semibold block">Frequência</span>
+                <span class="text-base font-bold text-pink-400">${postsPerDay} <span class="text-[10px] text-gray-400 font-normal">/ dia</span></span>
               </div>
             </div>
 
@@ -508,7 +538,7 @@
             <div class="mb-5 bg-gradient-to-r from-cyan-950/20 to-rose-950/20 border border-gray-800 p-3 rounded-xl flex items-center gap-2.5">
               <i class="fa-regular fa-clock text-rose-400"></i>
               <div class="text-xs">
-                <span class="text-gray-400">Autonomia do Estoque:</span>
+                <span class="text-gray-400">Autonomia Total (Fila + Nuvem):</span>
                 <span class="font-semibold text-white block">${p.duration_text}</span>
               </div>
             </div>
