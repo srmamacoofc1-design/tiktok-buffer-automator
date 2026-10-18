@@ -23,17 +23,20 @@ class BufferClient:
         data_bytes = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(BUFFER_API_URL, data=data_bytes, headers=self.headers)
         
-        for attempt in range(retries):
+        is_vercel = bool(os.environ.get("VERCEL"))
+        timeout = 5 if is_vercel else 20
+        max_attempts = 1 if is_vercel else retries
+
+        for attempt in range(max_attempts):
             try:
-                with urllib.request.urlopen(req) as resp:
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
                     res = json.loads(resp.read().decode("utf-8"))
                     if "errors" in res:
                         raise Exception(f"Buffer GraphQL Error: {json.dumps(res['errors'])}")
                     return res.get("data", {})
             except urllib.error.HTTPError as e:
-                if e.code == 429 and attempt < retries - 1:
-                    wait_time = (attempt + 1) * 10
-                    print(f"    [Buffer Rate Limit 429] Aguardando {wait_time}s antes de tentar novamente...")
+                if e.code == 429 and attempt < max_attempts - 1 and not is_vercel:
+                    wait_time = (attempt + 1) * 5
                     import time
                     time.sleep(wait_time)
                 else:
