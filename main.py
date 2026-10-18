@@ -128,13 +128,13 @@ def list_profiles():
             p["buffer_online"] = False
             p["buffer_error"] = str(e)
             
-        # Cálculo de duração do estoque em dias
-        total_remaining = stock_count
+        # Cálculo de duração total (Buffer + Estoque) em dias
+        total_remaining = p["buffer_queue_count"] + stock_count
         duration_days = round(total_remaining / posts_per_day, 1)
         end_date = datetime.now() + timedelta(days=duration_days)
         
         p["duration_days"] = duration_days
-        p["duration_text"] = f"{duration_days} dias (até {end_date.strftime('%d/%m/%Y')})" if total_remaining > 0 else "Estoque vazio"
+        p["duration_text"] = f"{duration_days} dias ({total_remaining} vídeos - até {end_date.strftime('%d/%m/%Y')})" if total_remaining > 0 else "Estoque vazio"
         
         profiles.append(p)
         
