@@ -242,9 +242,24 @@ def upload_video_to_public_url(local_path: str) -> str:
         raise FileNotFoundError(f"Arquivo não encontrado: {local_path}")
 
     filename = os.path.basename(local_path)
-    clean_filename = f"{int(datetime.now().timestamp())}_{filename}"
+    import unicodedata, re
+    nfkd = unicodedata.normalize('NFKD', filename)
+    ascii_str = nfkd.encode('ASCII', 'ignore').decode('ASCII')
+    clean_base = re.sub(r'[^a-zA-Z0-9_\.]', '_', ascii_str)
+    clean_filename = f"{int(datetime.now().timestamp())}_{clean_base}"
 
-    # 1. Tentar upload direto no Supabase Storage do usuário
+
+    # 1. Tentar túnel Cloudflare local se cloudflared.exe estiver presente
+    try:
+        from tunnel_manager import CloudflareTunnel
+        tunnel = CloudflareTunnel.get_instance()
+        tunnel_url = tunnel.get_public_url_for_file(local_path)
+        if tunnel_url and tunnel_url.startswith("http"):
+            return tunnel_url
+    except Exception as e:
+        print(f"Aviso: Túnel Cloudflare indisponível ({e}), tentando Supabase...")
+
+    # 2. Tentar upload direto no Supabase Storage do usuário
     try:
         from supabase import create_client
         supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)

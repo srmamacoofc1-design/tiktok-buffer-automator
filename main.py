@@ -49,6 +49,11 @@ app.add_middleware(
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
+SHORTS_DIR = r"C:\Users\leurickkkk77\Downloads\Shorts_210_EDITADOS"
+if os.path.exists(SHORTS_DIR):
+    app.mount("/shorts", StaticFiles(directory=SHORTS_DIR), name="shorts")
+
+
 @app.get("/", response_class=HTMLResponse)
 def index():
     html_path = os.path.join(STATIC_DIR, "index.html")

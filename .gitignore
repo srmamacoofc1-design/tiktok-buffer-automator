@@ -5,3 +5,4 @@ __pycache__/
 *.pyc
 uploads/*
 !uploads/.gitkeep
+cloudflared.exe
