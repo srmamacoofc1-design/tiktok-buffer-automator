@@ -62,6 +62,25 @@ def index():
             return f.read()
     return "<h1>Frontend em construção...</h1>"
 
+@app.get("/api/version")
+def get_version():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) as cnt FROM video_stock")
+    stock_total = cursor.fetchone()["cnt"]
+    cursor.execute("SELECT COUNT(*) as cnt FROM video_stock WHERE status = 'estoque'")
+    estoque_total = cursor.fetchone()["cnt"]
+    cursor.execute("SELECT COUNT(*) as cnt FROM video_stock WHERE status = 'agendado_no_buffer'")
+    agendado_total = cursor.fetchone()["cnt"]
+    conn.close()
+    return {
+        "version": "1.0.2",
+        "video_stock_total": stock_total,
+        "estoque_total": estoque_total,
+        "agendado_total": agendado_total,
+        "db_exists": os.path.exists(os.path.join(os.path.dirname(__file__), "data", "app.db"))
+    }
+
 @app.get("/api/profiles")
 def list_profiles():
     conn = get_db()
