@@ -143,11 +143,12 @@ def get_all_metrics():
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT p.id, p.name, a.token, a.org_id
+        SELECT p.id, p.name, p.channel_id, a.token, a.org_id
         FROM profiles p
         JOIN accounts a ON p.account_id = a.id
         WHERE p.active = 1
     """)
+
     profiles = cursor.fetchall()
     conn.close()
 
