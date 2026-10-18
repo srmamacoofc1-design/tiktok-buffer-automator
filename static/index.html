@@ -365,6 +365,58 @@
     </div>
   </div>
 
+  <!-- Modal: Horários, Miniaturas e Fila -->
+  <div id="schedule-modal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+      <!-- Modal Header -->
+      <div class="p-5 border-b border-gray-800 flex items-center justify-between bg-gray-950/70">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-xl bg-gradient-to-tr from-cyan-500 to-rose-500 flex items-center justify-center text-white text-xl shadow-lg">
+            <i class="fa-brands fa-tiktok"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-white text-lg flex items-center gap-2" id="modal-sched-title">
+              @perfil <span class="text-xs bg-gray-800 text-gray-300 px-2 py-0.5 rounded-full font-normal">Fila & Histórico</span>
+            </h3>
+            <p class="text-xs text-gray-400">Linha do tempo: veja os horários já postados no TikTok e os vídeos agendados que faltam!</p>
+          </div>
+        </div>
+        <button onclick="closeScheduleModal()" class="w-9 h-9 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white flex items-center justify-center transition">
+          <i class="fa-solid fa-xmark text-base"></i>
+        </button>
+      </div>
+
+      <!-- Sub Tabs inside Modal -->
+      <div class="px-5 pt-3 bg-gray-950/40 border-b border-gray-800 flex gap-4 text-xs font-semibold overflow-x-auto">
+        <button onclick="switchScheduleTab('scheduled')" id="subtab-btn-scheduled" class="py-2.5 px-3 border-b-2 border-cyan-400 text-cyan-400 flex items-center gap-2 transition whitespace-nowrap">
+          <i class="fa-solid fa-clock text-cyan-400"></i> Faltam Postar (<span id="modal-count-scheduled">0</span>)
+        </button>
+        <button onclick="switchScheduleTab('sent')" id="subtab-btn-sent" class="py-2.5 px-3 text-gray-400 hover:text-white flex items-center gap-2 transition border-b-2 border-transparent whitespace-nowrap">
+          <i class="fa-solid fa-circle-check text-emerald-400"></i> Já Postados no TikTok (<span id="modal-count-sent">0</span>)
+        </button>
+        <button onclick="switchScheduleTab('reserve')" id="subtab-btn-reserve" class="py-2.5 px-3 text-gray-400 hover:text-white flex items-center gap-2 transition border-b-2 border-transparent whitespace-nowrap">
+          <i class="fa-solid fa-cloud-arrow-down text-pink-400"></i> Reserva Nuvem (<span id="modal-count-reserve">0</span>)
+        </button>
+      </div>
+
+      <!-- Modal Body (Scrollable) -->
+      <div class="p-5 overflow-y-auto flex-1 space-y-3" id="modal-sched-body">
+        <div class="text-center py-16 text-gray-400">
+          <i class="fa-solid fa-circle-notch fa-spin text-3xl text-cyan-400 mb-3"></i>
+          <p class="text-sm font-medium">Buscando horários e miniaturas da conta...</p>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-4 border-t border-gray-800 bg-gray-950/60 flex items-center justify-between text-xs text-gray-400">
+        <span class="flex items-center gap-1.5"><i class="fa-solid fa-circle-info text-cyan-400"></i> Horários convertidos automaticamente para Horário de Brasília.</span>
+        <button onclick="loadScheduleDetails(currentSchedulePid, true)" class="bg-gray-800 hover:bg-gray-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-rotate"></i> Atualizar Fila Agora
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let globalProfiles = [];
     let selectedFiles = [];
@@ -543,7 +595,11 @@
               </div>
             </div>
 
-            <button onclick="goToUploadForProfile(${p.id})" class="w-full bg-gray-800 hover:bg-rose-600 text-white font-medium text-xs py-2.5 rounded-xl transition flex items-center justify-center gap-2">
+            <button onclick="openScheduleModal(${p.id}, '${p.name}')" class="w-full mb-2 bg-gradient-to-r from-cyan-600 to-rose-600 hover:from-cyan-500 hover:to-rose-500 text-white font-semibold text-xs py-2.5 rounded-xl transition flex items-center justify-center gap-2 shadow-lg">
+              <i class="fa-solid fa-photo-film"></i> Ver Horários & Miniaturas
+            </button>
+
+            <button onclick="goToUploadForProfile(${p.id})" class="w-full bg-gray-800/80 hover:bg-gray-700 text-gray-300 hover:text-white font-medium text-xs py-2 rounded-xl transition flex items-center justify-center gap-2 border border-gray-700/60">
               <i class="fa-solid fa-plus"></i> Abastecer Este Perfil
             </button>
           </div>
@@ -856,6 +912,239 @@
         loadProfiles();
       } else {
         alert('Erro ao salvar configurações.');
+      }
+    }
+
+    // Modal de Horários, Fila e Miniaturas
+    let currentSchedulePid = null;
+    let currentScheduleData = null;
+    let currentScheduleTab = 'scheduled';
+
+    function formatScheduleDate(isoString) {
+      if (!isoString) return '-';
+      try {
+        const d = new Date(isoString);
+        const today = new Date();
+        const isToday = d.toDateString() === today.toDateString();
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const isTomorrow = d.toDateString() === tomorrow.toDateString();
+
+        const hours = String(d.getHours()).padStart(2, '0');
+        const mins = String(d.getMinutes()).padStart(2, '0');
+        const timeStr = `${hours}:${mins}`;
+
+        if (isToday) {
+          return `Hoje às ${timeStr}`;
+        } else if (isTomorrow) {
+          return `Amanhã às ${timeStr}`;
+        } else {
+          const day = String(d.getDate()).padStart(2, '0');
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          return `${day}/${month} às ${timeStr}`;
+        }
+      } catch (e) {
+        return isoString;
+      }
+    }
+
+    async function openScheduleModal(pid, profileName) {
+      currentSchedulePid = pid;
+      currentScheduleTab = 'scheduled';
+      document.getElementById('modal-sched-title').innerHTML = `@${profileName} <span class="text-xs bg-gray-800 text-gray-300 px-2 py-0.5 rounded-full font-normal">Fila & Histórico</span>`;
+      document.getElementById('schedule-modal').classList.remove('hidden');
+      switchScheduleTab('scheduled');
+      await loadScheduleDetails(pid, false);
+    }
+
+    function closeScheduleModal() {
+      document.getElementById('schedule-modal').classList.add('hidden');
+    }
+
+    async function loadScheduleDetails(pid, force = false) {
+      const body = document.getElementById('modal-sched-body');
+      body.innerHTML = `
+        <div class="text-center py-16 text-gray-400">
+          <i class="fa-solid fa-circle-notch fa-spin text-3xl text-cyan-400 mb-3"></i>
+          <p class="text-sm font-medium">Buscando horários e miniaturas da conta...</p>
+        </div>
+      `;
+
+      try {
+        const url = force ? `/api/profiles/${pid}/schedule-and-history?force=true` : `/api/profiles/${pid}/schedule-and-history`;
+        const res = await fetch(url);
+        currentScheduleData = await res.json();
+        
+        document.getElementById('modal-count-scheduled').innerText = (currentScheduleData.scheduled || []).length;
+        document.getElementById('modal-count-sent').innerText = (currentScheduleData.sent || []).length;
+        document.getElementById('modal-count-reserve').innerText = (currentScheduleData.cloud_reserve || []).length;
+
+        renderScheduleTabContent();
+      } catch (e) {
+        body.innerHTML = `<div class="p-8 text-center text-rose-400">Erro ao carregar dados: ${e}</div>`;
+      }
+    }
+
+    function switchScheduleTab(tab) {
+      currentScheduleTab = tab;
+      const tabs = ['scheduled', 'sent', 'reserve'];
+      tabs.forEach(t => {
+        const btn = document.getElementById(`subtab-btn-${t}`);
+        if (t === tab) {
+          btn.className = 'py-2.5 px-3 border-b-2 border-cyan-400 text-cyan-400 flex items-center gap-2 transition whitespace-nowrap font-bold';
+        } else {
+          btn.className = 'py-2.5 px-3 text-gray-400 hover:text-white flex items-center gap-2 transition border-b-2 border-transparent whitespace-nowrap';
+        }
+      });
+      if (currentScheduleData) {
+        renderScheduleTabContent();
+      }
+    }
+
+    function renderScheduleTabContent() {
+      const body = document.getElementById('modal-sched-body');
+      if (!currentScheduleData) return;
+
+      if (currentScheduleTab === 'scheduled') {
+        const list = currentScheduleData.scheduled || [];
+        if (!list.length) {
+          body.innerHTML = `
+            <div class="text-center py-12 text-gray-500">
+              <i class="fa-regular fa-calendar-xmark text-3xl mb-2 block text-gray-600"></i>
+              Nenhum vídeo agendado na fila no momento.
+            </div>
+          `;
+          return;
+        }
+
+        body.innerHTML = list.map((item, idx) => `
+          <div class="bg-gray-800/60 border border-gray-700/60 hover:border-cyan-500/50 p-3.5 rounded-xl flex items-center gap-4 transition shadow">
+            <div class="relative w-20 h-28 sm:w-24 sm:h-32 rounded-lg overflow-hidden bg-black flex-shrink-0 border border-gray-700 group">
+              ${item.thumbnail ? `
+                <img src="${item.thumbnail}" alt="Capa" class="w-full h-full object-cover">
+              ` : (item.video_url ? `
+                <video src="${item.video_url}#t=0.5" preload="metadata" class="w-full h-full object-cover"></video>
+              ` : `
+                <div class="w-full h-full flex flex-col items-center justify-center text-gray-600">
+                  <i class="fa-solid fa-film text-xl"></i>
+                </div>
+              `)}
+              <div class="absolute top-1.5 left-1.5 bg-cyan-950/90 text-cyan-400 text-[10px] px-1.5 py-0.5 rounded font-mono font-bold border border-cyan-800/80">
+                #${idx + 1}
+              </div>
+              ${item.video_url ? `
+                <a href="${item.video_url}" target="_blank" title="Ver vídeo" class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition text-lg">
+                  <i class="fa-solid fa-circle-play"></i>
+                </a>
+              ` : ''}
+            </div>
+
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1 flex-wrap">
+                <span class="bg-cyan-950 text-cyan-300 border border-cyan-800/70 text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+                  <i class="fa-regular fa-clock text-cyan-400"></i> ${formatScheduleDate(item.due_at)}
+                </span>
+                <span class="bg-amber-950/80 text-amber-300 border border-amber-800/60 text-[10px] px-2 py-0.5 rounded-full">
+                  ⏳ Falta Postar
+                </span>
+              </div>
+              <h4 class="font-bold text-white text-sm line-clamp-2 mt-1 mb-1">
+                ${item.title}
+              </h4>
+              <p class="text-[11px] text-gray-400 line-clamp-2">
+                ${item.full_text}
+              </p>
+            </div>
+          </div>
+        `).join('');
+
+      } else if (currentScheduleTab === 'sent') {
+        const list = currentScheduleData.sent || [];
+        if (!list.length) {
+          body.innerHTML = `
+            <div class="text-center py-12 text-gray-500">
+              <i class="fa-solid fa-clock-rotate-left text-3xl mb-2 block text-gray-600"></i>
+              Nenhum post publicado recentemente registrado para este perfil.
+            </div>
+          `;
+          return;
+        }
+
+        body.innerHTML = list.map((item, idx) => `
+          <div class="bg-gray-800/60 border border-gray-700/60 hover:border-emerald-500/50 p-3.5 rounded-xl flex items-center gap-4 transition shadow">
+            <div class="relative w-20 h-28 sm:w-24 sm:h-32 rounded-lg overflow-hidden bg-black flex-shrink-0 border border-gray-700 group">
+              ${item.thumbnail ? `
+                <img src="${item.thumbnail}" alt="Capa" class="w-full h-full object-cover">
+              ` : (item.video_url ? `
+                <video src="${item.video_url}#t=0.5" preload="metadata" class="w-full h-full object-cover"></video>
+              ` : `
+                <div class="w-full h-full flex flex-col items-center justify-center text-gray-600">
+                  <i class="fa-brands fa-tiktok text-xl text-rose-500"></i>
+                </div>
+              `)}
+              <div class="absolute top-1.5 left-1.5 bg-emerald-950/90 text-emerald-400 text-[10px] px-1.5 py-0.5 rounded font-mono font-bold border border-emerald-800/80">
+                ✓
+              </div>
+            </div>
+
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1 flex-wrap">
+                <span class="bg-emerald-950 text-emerald-300 border border-emerald-800/70 text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+                  <i class="fa-solid fa-check-double text-emerald-400"></i> Postado em: ${formatScheduleDate(item.sent_at)}
+                </span>
+                <span class="bg-gray-800 text-gray-300 text-[10px] px-2 py-0.5 rounded-full">
+                  TikTok Publicado
+                </span>
+              </div>
+              <h4 class="font-bold text-white text-sm line-clamp-2 mt-1 mb-1">
+                ${item.title}
+              </h4>
+              <p class="text-[11px] text-gray-400 line-clamp-1 mb-2">
+                ${item.full_text}
+              </p>
+              ${item.external_link ? `
+                <a href="${item.external_link}" target="_blank" class="inline-flex items-center gap-1.5 text-xs text-rose-400 hover:text-rose-300 font-semibold transition bg-rose-950/40 border border-rose-900/60 px-3 py-1 rounded-lg">
+                  <i class="fa-brands fa-tiktok"></i> Assistir Vídeo no TikTok <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                </a>
+              ` : ''}
+            </div>
+          </div>
+        `).join('');
+
+      } else if (currentScheduleTab === 'reserve') {
+        const list = currentScheduleData.cloud_reserve || [];
+        if (!list.length) {
+          body.innerHTML = `
+            <div class="text-center py-12 text-gray-500">
+              <i class="fa-solid fa-box-open text-3xl mb-2 block text-gray-600"></i>
+              Nenhum vídeo adicional na reserva de estoque no momento.
+            </div>
+          `;
+          return;
+        }
+
+        body.innerHTML = `
+          <div class="mb-3 p-3 bg-pink-950/30 border border-pink-900/50 rounded-xl text-xs text-pink-300 flex items-center gap-2">
+            <i class="fa-solid fa-circle-info"></i>
+            Estes vídeos estão prontos na nuvem do GitHub Releases e entrarão automaticamente na fila do Buffer assim que as vagas abrirem!
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            ${list.map((item, idx) => `
+              <div class="bg-gray-800/40 border border-gray-800 p-3 rounded-xl flex items-center gap-3">
+                <div class="relative w-16 h-20 rounded-lg overflow-hidden bg-black flex-shrink-0 border border-gray-700">
+                  <video src="${item.public_url}#t=0.5" preload="metadata" class="w-full h-full object-cover"></video>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <span class="text-[9px] text-pink-400 bg-pink-950/50 border border-pink-900/60 px-1.5 py-0.5 rounded font-mono">
+                    Próximo da fila #${idx + 1}
+                  </span>
+                  <h5 class="text-white text-xs font-semibold mt-1 truncate" title="${item.title}">${item.title}</h5>
+                  <p class="text-[10px] text-gray-500 font-mono truncate">${item.filename}</p>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
       }
     }
 

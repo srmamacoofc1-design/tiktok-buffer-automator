@@ -239,6 +239,98 @@ class BufferClient:
                 "recent_posts": []
             }
 
+    def get_profile_schedule_and_history(self, org_id: str, channel_id: str) -> Dict[str, Any]:
+        """Busca os posts agendados na fila (que faltam) e os posts já enviados (já postados) com horários e miniaturas"""
+        query = """
+        query GetQueueAndHistory($orgId: OrganizationId!, $channelId: ChannelId!) {
+          scheduled: posts(first: 20, input: {
+            organizationId: $orgId,
+            filter: { status: [scheduled], channelIds: [$channelId] }
+          }) {
+            edges {
+              node {
+                id
+                text
+                dueAt
+                status
+                assets {
+                  ... on VideoAsset {
+                    thumbnail
+                    source
+                  }
+                }
+              }
+            }
+          }
+          sent: posts(first: 20, input: {
+            organizationId: $orgId,
+            filter: { status: [sent], channelIds: [$channelId] }
+          }) {
+            edges {
+              node {
+                id
+                text
+                sentAt
+                status
+                externalLink
+                assets {
+                  ... on VideoAsset {
+                    thumbnail
+                    source
+                  }
+                }
+              }
+            }
+          }
+        }
+        """
+        data = self.execute_query(query, {"orgId": org_id, "channelId": channel_id})
+        
+        def _extract_items(edges, is_sent=False):
+            items = []
+            for e in edges:
+                node = e.get("node", {})
+                assets = node.get("assets", [])
+                thumb = None
+                video_url = None
+                if assets and isinstance(assets, list):
+                    for a in assets:
+                        if isinstance(a, dict):
+                            thumb = a.get("thumbnail") or thumb
+                            video_url = a.get("source") or video_url
+                            
+                item = {
+                    "id": node.get("id"),
+                    "title": (node.get("text") or "").strip().split("\n")[0][:80] or "Vídeo TikTok",
+                    "full_text": (node.get("text") or "").strip(),
+                    "status": node.get("status"),
+                    "thumbnail": thumb,
+                    "video_url": video_url
+                }
+                if is_sent:
+                    item["sent_at"] = node.get("sentAt")
+                    item["external_link"] = node.get("externalLink")
+                else:
+                    item["due_at"] = node.get("dueAt")
+                items.append(item)
+            return items
+
+        scheduled_edges = data.get("scheduled", {}).get("edges", [])
+        sent_edges = data.get("sent", {}).get("edges", [])
+
+        scheduled_items = _extract_items(scheduled_edges, is_sent=False)
+        sent_items = _extract_items(sent_edges, is_sent=True)
+
+        scheduled_items.sort(key=lambda x: x.get("due_at") or "")
+        sent_items.sort(key=lambda x: x.get("sent_at") or "", reverse=True)
+
+        return {
+            "scheduled": scheduled_items,
+            "sent": sent_items,
+            "scheduled_count": len(scheduled_items),
+            "sent_count": len(sent_items)
+        }
+
 
 
 SUPABASE_URL = "https://zjrvsqpfmhazcxqjwlei.supabase.co"

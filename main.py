@@ -166,6 +166,57 @@ def get_profile_metrics(profile_id: int):
     metrics["profile_name"] = p["name"]
     return metrics
 
+_SCHEDULE_CACHE = {}
+
+@app.get("/api/profiles/{profile_id}/schedule-and-history")
+def get_profile_schedule_and_history(profile_id: int, force: bool = False):
+    import time
+    now = time.time()
+    cache_key = f"profile_{profile_id}"
+    if not force and cache_key in _SCHEDULE_CACHE and (now - _SCHEDULE_CACHE[cache_key]["time"] < 60):
+        return _SCHEDULE_CACHE[cache_key]["data"]
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT p.*, a.token, a.org_id
+        FROM profiles p
+        JOIN accounts a ON p.account_id = a.id
+        WHERE p.id = ?
+    """, (profile_id,))
+    p = cursor.fetchone()
+
+    cursor.execute("""
+        SELECT id, filename, title, public_url, created_at
+        FROM video_stock
+        WHERE profile_id = ? AND status = 'estoque'
+        ORDER BY id ASC LIMIT 10
+    """, (profile_id,))
+    stock_items = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+
+    if not p:
+        raise HTTPException(status_code=404, detail="Perfil não encontrado")
+
+    try:
+        client = BufferClient(p["token"])
+        data = client.get_profile_schedule_and_history(p["org_id"], p["channel_id"])
+        data["profile_id"] = profile_id
+        data["profile_name"] = p["name"]
+        data["cloud_reserve"] = stock_items
+        
+        _SCHEDULE_CACHE[cache_key] = {"data": data, "time": now}
+        return data
+    except Exception as e:
+        return {
+            "profile_id": profile_id,
+            "profile_name": p["name"],
+            "error": str(e),
+            "scheduled": [],
+            "sent": [],
+            "cloud_reserve": stock_items
+        }
+
 _METRICS_CACHE = {"data": None, "timestamp": 0}
 
 @app.get("/api/metrics-summary")
