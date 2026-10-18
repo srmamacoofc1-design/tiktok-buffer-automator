@@ -1,0 +1,39 @@
+name: Buffer Cloud Feeder 24/7
+
+on:
+  schedule:
+    # Executa a cada 30 minutos na nuvem do GitHub (24h por dia, 7 dias por semana)
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  run-feeder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          pip install requests
+
+      - name: Run Buffer Feeder
+        run: |
+          python cloud_feeder.py
+
+      - name: Commit and Push Database Updates
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/app.db
+          git diff --staged --quiet || (git commit -m "Auto-feed: Buffer agendado na nuvem [skip ci]" && git push)
