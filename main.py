@@ -184,7 +184,27 @@ def get_profile_schedule_and_history(profile_id: int, force: bool = False):
         ORDER BY id ASC LIMIT 10
     """, (profile_id,))
     stock_items = [dict(r) for r in cursor.fetchall()]
+
+    cursor.execute("""
+        SELECT id, filename, title, caption, public_url, scheduled_at, status
+        FROM video_stock
+        WHERE profile_id = ? AND status = 'agendado_no_buffer'
+        ORDER BY scheduled_at ASC
+    """, (profile_id,))
+    scheduled_db = [dict(r) for r in cursor.fetchall()]
     conn.close()
+
+    db_scheduled_items = []
+    for idx, item in enumerate(scheduled_db):
+        db_scheduled_items.append({
+            "id": f"db_{item['id']}",
+            "title": item["title"],
+            "full_text": item["caption"] or item["title"],
+            "status": "scheduled",
+            "due_at": item["scheduled_at"],
+            "thumbnail": None,
+            "video_url": item["public_url"]
+        })
 
     if not p:
         raise HTTPException(status_code=404, detail="Perfil não encontrado")
@@ -192,6 +212,8 @@ def get_profile_schedule_and_history(profile_id: int, force: bool = False):
     try:
         client = BufferClient(p["token"])
         data = client.get_profile_schedule_and_history(p["org_id"], p["channel_id"])
+        if not data.get("scheduled"):
+            data["scheduled"] = db_scheduled_items
         data["profile_id"] = profile_id
         data["profile_name"] = p["name"]
         data["cloud_reserve"] = stock_items
@@ -203,7 +225,7 @@ def get_profile_schedule_and_history(profile_id: int, force: bool = False):
             "profile_id": profile_id,
             "profile_name": p["name"],
             "error": str(e),
-            "scheduled": [],
+            "scheduled": db_scheduled_items,
             "sent": [],
             "cloud_reserve": stock_items
         }
