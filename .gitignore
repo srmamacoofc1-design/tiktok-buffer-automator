@@ -13,3 +13,4 @@ inspect_*.py
 list_*.py
 quick_*.py
 upload_missing_to_cloud.py
+setup_cache_db.py

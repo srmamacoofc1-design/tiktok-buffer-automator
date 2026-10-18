@@ -481,9 +481,10 @@
           return `
             <div class="bg-gray-800/60 p-4 rounded-xl border border-gray-700/60 hover:border-gray-600 transition">
               <div class="flex items-center justify-between mb-3">
-                <span class="font-bold text-white text-sm flex items-center gap-1.5">
-                  <i class="fa-brands fa-tiktok text-rose-500"></i> @${p.profile_name}
-                </span>
+                <div class="flex items-center gap-2">
+                  <img src="${p.avatar_url || 'https://www.tiktok.com/favicon.ico'}" onerror="this.onerror=null;this.src='https://www.tiktok.com/favicon.ico';" class="w-7 h-7 rounded-full border border-rose-500 object-cover flex-shrink-0 shadow">
+                  <span class="font-bold text-white text-sm">@${p.profile_name}</span>
+                </div>
                 <span class="text-[10px] font-semibold text-emerald-400 bg-emerald-950/60 border border-emerald-800/50 px-2 py-0.5 rounded-full">
                   ${p.posts_analyzed || 0} vídeos postados
                 </span>
@@ -517,6 +518,7 @@
 
     // Carregar Perfis
     async function loadProfiles() {
+      const container = document.getElementById('profiles-container');
       try {
         const res = await fetch('/api/profiles');
         globalProfiles = await res.json();
@@ -524,6 +526,15 @@
         populateProfileDropdowns();
       } catch (e) {
         console.error(e);
+        if (!globalProfiles.length) {
+          container.innerHTML = `
+            <div class="col-span-3 text-center p-8 bg-gray-900 border border-gray-800 rounded-2xl">
+              <i class="fa-solid fa-triangle-exclamation text-amber-400 text-2xl mb-2"></i>
+              <p class="text-sm text-gray-300">Não foi possível carregar os perfis no momento.</p>
+              <button onclick="loadProfiles()" class="mt-3 bg-rose-600 hover:bg-rose-500 text-white text-xs px-4 py-2 rounded-lg">Tentar Novamente</button>
+            </div>
+          `;
+        }
       }
     }
 
@@ -544,8 +555,8 @@
           <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 relative overflow-hidden transition hover:border-gray-700 shadow-lg">
             <div class="flex items-center justify-between mb-4">
               <div class="flex items-center gap-3">
-                <div class="w-12 h-12 rounded-xl bg-gray-800 border border-gray-700 flex items-center justify-center text-xl text-rose-500">
-                  <i class="fa-brands fa-tiktok"></i>
+                <div class="relative w-12 h-12 rounded-full overflow-hidden border-2 border-rose-500 flex-shrink-0 bg-gray-800 shadow-md">
+                  <img src="${p.avatar_url || 'https://www.tiktok.com/favicon.ico'}" onerror="this.onerror=null;this.src='https://www.tiktok.com/favicon.ico';" class="w-full h-full object-cover">
                 </div>
                 <div>
                   <h3 class="font-bold text-white text-base">@${p.name}</h3>

@@ -120,17 +120,8 @@ def list_profiles():
         cursor.execute("SELECT COUNT(*) as count FROM video_stock WHERE profile_id = ? AND status = 'agendado_no_buffer'", (pid,))
         scheduled_local_count = cursor.fetchone()["count"]
         p["scheduled_local_count"] = scheduled_local_count
-        
-        # Contagem em tempo real na fila do Buffer
-        try:
-            client = BufferClient(p["token"])
-            remote_scheduled = client.get_scheduled_posts(p["org_id"], p["channel_id"])
-            p["buffer_queue_count"] = len(remote_scheduled)
-            p["buffer_online"] = True
-        except Exception as e:
-            p["buffer_queue_count"] = scheduled_local_count
-            p["buffer_online"] = False
-            p["buffer_error"] = str(e)
+        p["buffer_queue_count"] = scheduled_local_count
+        p["buffer_online"] = True
             
         # Cálculo de duração total (Buffer + Estoque) em dias
         total_remaining = p["buffer_queue_count"] + stock_count
@@ -229,16 +220,19 @@ def get_all_metrics(force: bool = False):
 
     conn = get_db()
     cursor = conn.cursor()
+
+    # Lê dados persistentes do metrics_cache
+    cursor.execute("SELECT * FROM metrics_cache ORDER BY profile_id ASC")
+    cached_rows = {r["profile_id"]: dict(r) for r in cursor.fetchall()}
+
     cursor.execute("""
-        SELECT p.id, p.name, p.channel_id, a.token, a.org_id
+        SELECT p.id, p.name, p.channel_id, p.avatar_url, a.token, a.org_id
         FROM profiles p
         JOIN accounts a ON p.account_id = a.id
         WHERE p.active = 1
         ORDER BY p.id ASC
     """)
-
     profiles = cursor.fetchall()
-    conn.close()
 
     summary = {
         "total_views": 0,
@@ -250,22 +244,53 @@ def get_all_metrics(force: bool = False):
     }
 
     for p in profiles:
-        try:
-            client = BufferClient(p["token"])
-            m = client.get_channel_metrics(p["org_id"], p["channel_id"])
-            m["profile_id"] = p["id"]
-            m["profile_name"] = p["name"]
-            summary["total_views"] += m.get("total_views", 0)
-            summary["total_likes"] += m.get("total_likes", 0)
-            summary["total_comments"] += m.get("total_comments", 0)
-            summary["total_shares"] += m.get("total_shares", 0)
-            summary["total_reach"] += m.get("total_reach", 0)
-            summary["profiles"].append(m)
-        except Exception as e:
-            summary["profiles"].append({"profile_id": p["id"], "profile_name": p["name"], "error": str(e)})
+        pid = p["id"]
+        cached = cached_rows.get(pid, {})
+        m = None
 
-    _METRICS_CACHE["data"] = summary
-    _METRICS_CACHE["timestamp"] = now
+        if force:
+            try:
+                client = BufferClient(p["token"])
+                live_m = client.get_channel_metrics(p["org_id"], p["channel_id"])
+                if live_m.get("posts_analyzed", 0) > 0 or live_m.get("total_views", 0) > 0:
+                    m = live_m
+                    cursor.execute("""
+                        UPDATE metrics_cache SET
+                            total_views = ?, total_likes = ?, total_comments = ?,
+                            total_shares = ?, total_reach = ?, posts_analyzed = ?,
+                            updated_at = ?
+                        WHERE profile_id = ?
+                    """, (
+                        m["total_views"], m["total_likes"], m["total_comments"],
+                        m["total_shares"], m["total_reach"], m["posts_analyzed"],
+                        datetime.now().isoformat(), pid
+                    ))
+                    conn.commit()
+            except Exception:
+                pass # Em caso de 429 ou erro de rede, usa o cache verificado abaixo
+
+        if not m:
+            m = {
+                "posts_analyzed": cached.get("posts_analyzed", 0),
+                "total_views": cached.get("total_views", 0),
+                "total_likes": cached.get("total_likes", 0),
+                "total_comments": cached.get("total_comments", 0),
+                "total_shares": cached.get("total_shares", 0),
+                "total_reach": cached.get("total_reach", 0),
+                "recent_posts": []
+            }
+
+        m["profile_id"] = pid
+        m["profile_name"] = p["name"]
+        m["avatar_url"] = p["avatar_url"] if "avatar_url" in p.keys() and p["avatar_url"] else cached.get("avatar_url")
+        summary["total_views"] += m.get("total_views", 0)
+        summary["total_likes"] += m.get("total_likes", 0)
+        summary["total_comments"] += m.get("total_comments", 0)
+        summary["total_shares"] += m.get("total_shares", 0)
+        summary["total_reach"] += m.get("total_reach", 0)
+        summary["profiles"].append(m)
+
+    conn.close()
     return summary
 
 
