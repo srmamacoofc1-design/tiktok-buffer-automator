@@ -575,6 +575,135 @@ def get_logs():
     conn.close()
     return rows
 
+@app.get("/api/cron/feed")
+def cron_auto_feed():
+    """
+    Endpoint chamado automaticamente pelo Vercel Cron a cada hora.
+    Verifica a fila de cada perfil e empurra vídeos do estoque para o Buffer.
+    Funciona mesmo com o PC desligado!
+    """
+    import time as _time
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT p.*, a.token, a.org_id
+        FROM profiles p
+        JOIN accounts a ON p.account_id = a.id
+        WHERE p.active = 1
+        ORDER BY p.id ASC
+    """)
+    profiles = cursor.fetchall()
+
+    results = []
+
+    for prof in profiles:
+        pid = prof["id"]
+        pname = prof["name"]
+        channel_id = prof["channel_id"]
+        token = prof["token"]
+        org_id = prof["org_id"]
+        max_queue = prof["max_buffer_queue"] or 10
+
+        daily_times = ["09:00", "12:00", "15:00", "18:00", "21:00"]
+        if prof["daily_times"]:
+            try:
+                daily_times = json.loads(prof["daily_times"])
+            except Exception:
+                pass
+
+        client = BufferClient(token)
+
+        # 1. Verificar fila atual no Buffer
+        try:
+            current_scheduled = client.get_scheduled_posts(org_id, channel_id)
+            current_count = len(current_scheduled)
+        except Exception as e:
+            results.append({"profile": pname, "error": str(e)})
+            continue
+
+        free_slots = max(0, max_queue - current_count)
+        if free_slots == 0:
+            results.append({"profile": pname, "status": "fila_cheia", "queue": f"{current_count}/{max_queue}", "pushed": 0})
+            continue
+
+        # 2. Buscar vídeos no estoque com URL pública
+        cursor.execute("""
+            SELECT * FROM video_stock
+            WHERE profile_id = ? AND status = 'estoque' AND public_url IS NOT NULL AND public_url != ''
+            ORDER BY id ASC
+            LIMIT ?
+        """, (pid, free_slots))
+        available = cursor.fetchall()
+
+        if not available:
+            results.append({"profile": pname, "status": "sem_estoque", "queue": f"{current_count}/{max_queue}", "pushed": 0})
+            continue
+
+        # 3. Calcular slots de horário
+        from feeder import get_next_available_slots
+        from datetime import timezone
+        existing_due_ats = []
+        for p_item in current_scheduled:
+            try:
+                due_str = p_item.get("dueAt")
+                if due_str:
+                    existing_due_ats.append(datetime.fromisoformat(due_str.replace("Z", "+00:00")))
+            except Exception:
+                pass
+
+        target_slots = get_next_available_slots(existing_due_ats, daily_times, len(available))
+
+        pushed = 0
+        for idx, vid in enumerate(available):
+            if idx >= len(target_slots):
+                break
+            vid_id = vid["id"]
+            slot_iso = target_slots[idx].strftime("%Y-%m-%dT%H:%M:%S.000Z")
+            caption = vid["caption"] or vid["title"] or "Novo vídeo"
+            video_url = vid["public_url"]
+
+            try:
+                post_res = client.create_tiktok_post(
+                    channel_id=channel_id,
+                    text=caption,
+                    video_url=video_url,
+                    due_at_iso=slot_iso,
+                    is_ai_generated=bool(vid["is_ai"])
+                )
+                b_id = post_res.get("id", "")
+                cursor.execute("""
+                    UPDATE video_stock
+                    SET status = 'agendado_no_buffer',
+                        buffer_post_id = ?,
+                        scheduled_at = ?
+                    WHERE id = ?
+                """, (b_id, slot_iso, vid_id))
+                conn.commit()
+                pushed += 1
+            except Exception as e:
+                cursor.execute("UPDATE video_stock SET status = 'erro', error_message = ? WHERE id = ?",
+                               (str(e)[:200], vid_id))
+                conn.commit()
+
+        results.append({
+            "profile": pname,
+            "status": "ok",
+            "queue": f"{current_count + pushed}/{max_queue}",
+            "pushed": pushed,
+            "estoque_restante": max(0, len(available) - pushed)
+        })
+
+    conn.close()
+    return {
+        "cron": "auto-feeder",
+        "executed_at": datetime.now().isoformat(),
+        "total_profiles": len(profiles),
+        "results": results
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
